@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>戦闘画面ベンチ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700&family=Zen+Kaku+Gothic+New:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 全画面の戦闘。左上=計測、右上=切り替え、下=JRPGの窓（味方の状態とコマンド） */
+:root{
+  --bg:#0b0d14; --win:rgba(14,20,44,.86); --win-line:#c9b98a; --fg:#f2eee2; --mute:#a7a9b9;
+  --hp:#5fd38a; --mp:#5aa9f0; --hpbg:#2a2f45; --accent:#f0c24f; --accent-ink:#1d1603;
+  --good:#7fd08a; --warn:#f0a04f; --bad:#f06a5f; --dmg:#fff4d6; --heal:#8fffb0;
+  --title:"Shippori Mincho B1","Yu Mincho",serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--body)}
+[hidden]{display:none!important}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hud{position:fixed;left:10px;top:calc(10px + env(safe-area-inset-top,0px));background:rgba(8,10,16,.72);border:1px solid #33384a;border-radius:7px;
+  padding:8px 10px;font-family:var(--mono);font-size:12px;line-height:1.5;font-variant-numeric:tabular-nums;pointer-events:none;max-width:46vw}
+.hud .big{font-size:20px}.hud .k{color:var(--mute)}.hud .st{font-family:var(--body);font-size:11px;color:var(--mute)}
+.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.ctl{position:fixed;right:10px;top:calc(10px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.seg{display:flex;border:1px solid #3a4058;border-radius:7px;overflow:hidden;background:rgba(8,10,16,.78)}
+.seg span{font-size:12px;color:var(--mute);padding:7px 8px;border-right:1px solid #3a4058}
+.seg button,.btn{font:inherit;font-size:13px;color:var(--fg);background:transparent;border:0;padding:7px 11px;cursor:pointer}
+.seg button+button{border-left:1px solid #3a4058}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn{background:rgba(8,10,16,.78);border:1px solid #3a4058;border-radius:7px}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.win{background:var(--win);border:2px solid var(--win-line);border-radius:6px;box-shadow:0 0 0 2px rgba(0,0,0,.5),inset 0 0 0 1px rgba(0,0,0,.6)}
+.bottom{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;align-items:flex-end;pointer-events:none}
+.cmd{padding:8px 6px;min-width:110px;font-size:15px}
+.cmd div{padding:3px 10px 3px 22px;position:relative}
+.cmd div.on::before{content:"";position:absolute;left:6px;top:50%;margin-top:-5px;border:5px solid transparent;border-left:8px solid var(--accent)}
+.party{flex:1;min-width:0;padding:6px 12px;display:grid;grid-template-columns:auto auto 1fr 1fr;column-gap:12px;row-gap:2px;align-items:center;font-size:14px}
+.party .nm{font-weight:700;white-space:nowrap}.party .jb{color:var(--mute);font-size:12px;white-space:nowrap}
+.party .on .nm{color:var(--accent)}
+.bar{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.bar i{flex:1;height:6px;background:var(--hpbg);border-radius:3px;overflow:hidden;min-width:40px}
+.bar i b{display:block;height:100%;background:var(--hp);transition:width .3s}
+.bar.mp i b{background:var(--mp)}
+.banner{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);padding:6px 22px;font-family:var(--title);font-size:20px;letter-spacing:.08em;white-space:nowrap;pointer-events:none}
+.dmg{position:fixed;pointer-events:none;font-family:var(--title);font-size:30px;color:var(--dmg);-webkit-text-stroke:1.5px #3a1406;text-shadow:0 2px 0 #000;
+  animation:pop 1s ease-out forwards;transform:translate(-50%,-50%)}
+.dmg.crit{font-size:40px;color:#ffd35a}
+@keyframes pop{0%{opacity:0;margin-top:10px}12%{opacity:1;margin-top:-18px}30%{margin-top:-10px}80%{opacity:1}100%{opacity:0;margin-top:-30px}}
+.dex{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:10px;align-items:center;padding:8px 12px}
+.dex .info{min-width:220px;text-align:center}
+.dex .info b{font-family:var(--title);font-size:18px;display:block}
+.dex .info span{font-family:var(--mono);font-size:12px;color:var(--mute)}
+.loading{position:fixed;inset:0;display:grid;place-items:center;font-size:15px;color:var(--mute);pointer-events:none}
+@media (max-width:760px){.party{grid-template-columns:auto 1fr 1fr}.party .jb{display:none}.cmd{display:none}.hud{max-width:60vw;font-size:11px}.banner{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.dmg{animation-duration:.01s}}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"./vendor/three.module.js",
+  "three/addons/":"./vendor/addons/",
+  "@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.min.js"
+}}
+</script>
+</head><body>
+<canvas id="c" aria-label="戦闘画面の3D表示"></canvas>
+<div class="loading" id="loading">読み込み中</div>
+<div class="hud" id="hud" aria-live="polite"></div>
+<div class="ctl">
+  <div class="seg" role="group" aria-label="味方"><span>味方</span><button data-p="kaykit">KayKit</button><button data-p="vroid">VRoid</button></div>
+  <div class="seg" role="group" aria-label="敵"><span>敵</span><button data-e="skel">骸骨</button><button data-e="mon">魔物</button></div>
+  <div class="seg" role="group" aria-label="負荷"><span>負荷</span><button data-l="0">軽</button><button data-l="1">中</button><button data-l="2">重</button></div>
+  <div style="display:flex;gap:6px"><button class="btn" id="dexBtn">図鑑</button><button class="btn" id="again">測り直す</button></div>
+</div>
+<div class="banner win" id="banner" hidden></div>
+<div class="bottom" id="battleUi">
+  <div class="cmd win" id="cmd"><div>攻撃</div><div>魔法</div><div>防御</div><div>道具</div></div>
+  <div class="party win" id="party"></div>
+</div>
+<div class="dex win" id="dex" hidden>
+  <button class="btn" id="dexPrev" aria-label="前のモデル">◀</button>
+  <div class="info"><b id="dexName"></b><span id="dexInfo"></span></div>
+  <button class="btn" id="dexNext" aria-label="次のモデル">▶</button>
+  <button class="btn" id="dexClose">戦闘に戻る</button>
+</div>
+
+<script type="module">
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+
+/* ---------- 名簿 ---------- */
+const PARTY={
+  kaykit:[{f:'p_Knight',name:'レオン',job:'騎士',atk:'1H_Melee_Attack_Chop',skill:'剛剣'},
+          {f:'p_Barbarian',name:'ガルド',job:'戦士',atk:'2H_Melee_Attack_Slice',skill:'断裂斬'},
+          {f:'p_Mage',name:'セラ',job:'魔導士',atk:'Spellcast_Shoot',magic:'火炎魔法'},
+          {f:'p_Rogue_Hooded',name:'ノア',job:'斥候',atk:'Dualwield_Melee_Attack_Slice',skill:'双刃'}],
+  vroid:[{f:'v_shino',vrm:1,name:'シノ',job:'剣士',skill:'一閃'},{f:'v_f',vrm:1,name:'リラ',job:'術士',magic:'雷撃魔法'},
+         {f:'v_shino',vrm:1,name:'カエデ',job:'槍兵',skill:'突き'},{f:'v_f',vrm:1,name:'ミオ',job:'癒し手',magic:'氷結魔法'}],
+};
+const ENEMY={
+  skel:[{f:'e_Skeleton_Warrior',name:'骸骨兵',atk:'1H_Melee_Attack_Chop'},{f:'e_Skeleton_Minion',name:'骸骨',atk:'1H_Melee_Attack_Chop'},
+        {f:'e_Skeleton_Rogue',name:'骸骨の斥候',atk:'Dualwield_Melee_Attack_Slice'},{f:'e_Skeleton_Mage',name:'骸骨の術師',atk:'Spellcast_Shoot',magic:1}],
+  mon:[{f:'q_dragon_evolved',name:'翼竜',h:3.2},{f:'q_demon_b',name:'魔族',h:2.2},{f:'q_blue_demon',name:'蒼魔',h:2.2},{f:'q_frog',name:'沼蛙',h:1.3},
+       {f:'q_goleling',name:'岩鬼',h:1.6},{f:'q_squidle',name:'烏賊魔',h:1.7},{f:'q_dragon',name:'竜',h:2.5},{f:'q_alpaking',name:'獣王',h:1.6},
+       {f:'q_demon_a',name:'小鬼',h:1.6},{f:'q_demon_c',name:'飛魔',h:2},{f:'q_enemy_small',name:'影',h:1.1},{f:'q_skeleton',name:'屍兵',h:1.8}],
+};
+const LEVELS=[
+  {name:'軽',enemy:3,shadow:0,   pr:1,  fx:1,bloom:0},
+  {name:'中',enemy:5,shadow:1024,pr:1.5,fx:2,bloom:0},
+  {name:'重',enemy:8,shadow:2048,pr:2,  fx:4,bloom:1},
+];
+const st={party:'kaykit',enemy:'skel',level:0};
+try{Object.assign(st,JSON.parse(localStorage.getItem('bb')||'{}'));}catch(e){}
+
+/* ---------- 読み込み ---------- */
+const loader=new GLTFLoader();
+let vrmLoader=null,VRMUtils=null,vrmError='';
+async function getVrmLoader(){
+  if(vrmLoader||vrmError)return vrmLoader;
+  try{const m=await import('@pixiv/three-vrm');VRMUtils=m.VRMUtils;vrmLoader=new GLTFLoader();vrmLoader.register(p=>new m.VRMLoaderPlugin(p));}
+  catch(e){vrmError='VRoid用の部品（jsdelivr）が読めなかった: '+e.message;}
+  return vrmLoader;
+}
+const bufCache={},gltfCache={},sizeOf={};
+function getBuf(f){return bufCache[f]??=fetch(f+'.glb').then(r=>{if(!r.ok)throw new Error(f+' '+r.status);return r.arrayBuffer();}).then(b=>{sizeOf[f]=b.byteLength;return b;});}
+function getGltf(f){return gltfCache[f]??=getBuf(f).then(b=>loader.parseAsync(b,''));}
+async function getVrm(f){const L=await getVrmLoader();if(!L)throw new Error(vrmError);const b=await getBuf(f);const g=await L.parseAsync(b.slice(0),'');const v=g.userData.vrm;VRMUtils.rotateVRM0(v);return v;}
+
+/* ---------- 描画の土台 ---------- */
+const cv=document.getElementById('c');
+const R=new T.WebGLRenderer({canvas:cv,antialias:true,powerPreference:'high-performance'});
+R.outputColorSpace=T.SRGBColorSpace;R.shadowMap.type=T.PCFShadowMap;R.toneMapping=T.ACESFilmicToneMapping;R.toneMappingExposure=.9;
+const scene=new T.Scene();scene.background=new T.Color(0x120f1c);scene.fog=new T.Fog(0x120f1c,22,60);
+const cam=new T.PerspectiveCamera(42,1,.1,200);
+scene.add(new T.HemisphereLight(0xc9d6ff,0x3a2a24,.85));
+const key=new T.DirectionalLight(0xffe2c0,2.6);key.position.set(6,14,9);scene.add(key);scene.add(key.target);
+const rim=new T.DirectionalLight(0x7aa0ff,1.2);rim.position.set(-8,6,-10);scene.add(rim);
+const torchLights=[];
+let composer=null,bloomPass=null;
+const stageG=new T.Group(),actorsG=new T.Group(),fxG=new T.Group(),dexG=new T.Group();scene.add(stageG,actorsG,fxG,dexG);
+
+/* ---------- 舞台（KayKit ダンジョン） ---------- */
+let stageBuilt=false;
+async function buildStage(scale){
+  stageG.clear();torchLights.length=0;
+  const g=await getGltf('stage');const tm={};g.scene.children.forEach(o=>tm[o.name]=o);
+  const S=scale*1.0,U=4*S;
+  const put=(n,x,z,ry=0,s=1,y=0)=>{const o=tm[n].clone();o.position.set(x,y,z);o.rotation.y=ry;o.scale.setScalar(S*s);stageG.add(o);return o;};
+  for(let i=-4;i<=4;i++)for(let j=-3;j<=2;j++)put((i*7+j*3)%5===0?'s_floor_tile_large_rocks':'s_floor_tile_large',i*U,j*U);
+  for(let i=-4;i<=4;i++)put(i%2?'s_wall':'s_wall_arched',i*U,-3.5*U);
+  for(const x of [-2.5,-.5,1.5,3.5].map(v=>v*U)){put('s_pillar_decorated',x-U*.5,-3.2*U);}
+  [-3,-1,1,3].forEach((i,k)=>{const t=put('s_torch_lit',i*U,-3.35*U,0,1,U*.45);
+    const l=new T.PointLight(0xff9a40,6,U*3.2,1.6);l.position.set(i*U,U*.75,-3.0*U);stageG.add(l);torchLights.push({l,s:k*1.7});});
+  put('s_banner_red',-.5*U,-3.3*U);put('s_banner_red',1.5*U,-3.3*U);
+  put('s_rubble_large',-4.2*U,-2*U,.4);put('s_barrel_large',4.4*U,-2.2*U);put('s_crates_stacked',4.1*U,-1.2*U,-.5);
+  put('s_chest_gold',-3.8*U,-2.6*U,.6);put('s_candle_triple',-3.3*U,-2.9*U);put('s_column',-4.3*U,1.2*U);put('s_column',4.4*U,1.4*U);
+  stageG.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=true;}});
+  stageBuilt=true;
+}
+
+/* ---------- 動きの名前を拾う ---------- */
+const PAT={idle:[/(^|\|)Idle($|\|)/,/Flying_Idle/,/Idle/],run:[/Running_A/,/(^|\|)Run($|\|)/,/Fast_Flying/,/Run/,/Walk/],
+  hit:[/Hit_A/,/HitReact/,/HitRecieve/,/Hit/],death:[/Death_A$/,/(^|\|)Death($|\|)/,/Death/],
+  attack:[/Attack/,/Punch/,/Headbutt/,/Sword/],cheer:[/Cheer/,/(^|\|)Yes/,/Wave/]};
+function pick(anims,kind,want){if(want){const a=anims.find(x=>x.name===want);if(a)return a;}
+  for(const p of PAT[kind]){const a=anims.find(x=>p.test(x.name));if(a)return a;}return anims[0];}
+function meshHeight(root){root.updateMatrixWorld(true);const b=new T.Box3();
+  root.traverse(o=>{if(o.isMesh){o.geometry.computeBoundingBox();b.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));}});
+  return Math.max(.01,b.max.y-b.min.y);}
+
+/* ---------- 役者 ---------- */
+class Actor{
+  constructor(def,side){this.def=def;this.side=side;this.o=new T.Group();this.alive=true;this.maxhp=def.hp||(side==='p'?320:180);this.hp=this.maxhp;this.mp=60;this.state='idle';this.t=0;}
+  async load(){
+    if(this.def.vrm){
+      const v=await getVrm(this.def.f);this.vrm=v;const m=v.scene;
+      const h=meshHeight(m);m.scale.setScalar(2.1/h);this.o.add(m);
+      m.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=true;}});
+      this.N=n=>v.humanoid.getNormalizedBoneNode(n);
+    }else{
+      const g=await getGltf(this.def.f);const m=SkeletonUtils.clone(g.scene);
+      const h=meshHeight(m);m.scale.setScalar((this.def.h||1.7)/h);this.o.add(m);
+      m.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=true;}});
+      this.mixer=new T.AnimationMixer(m);const A=g.animations;
+      this.clips={idle:pick(A,'idle'),run:pick(A,'run'),hit:pick(A,'hit'),death:pick(A,'death'),attack:pick(A,'attack',this.def.atk),cheer:pick(A,'cheer')};
+      this.acts={};for(const k in this.clips)this.acts[k]=this.mixer.clipAction(this.clips[k]);
+      for(const k of ['hit','death','attack','cheer']){this.acts[k].setLoop(T.LoopOnce);this.acts[k].clampWhenFinished=true;}
+      this.cur=null;this.play('idle');
+    }
+    this.o.traverse(o=>{if(o.isMesh)o.userData.actor=this;});
+    return this;
+  }
+  play(k){this.state=k;this.t=0;if(!this.acts)return .9;
+    const a=this.acts[k];if(this.cur===a&&k!=='attack'&&k!=='hit')return a.getClip().duration;
+    a.reset().setEffectiveWeight(1).fadeIn(.12).play();if(this.cur&&this.cur!==a)this.cur.fadeOut(.12);this.cur=a;return a.getClip().duration;}
+  update(dt){
+    this.t+=dt;if(this.mixer)this.mixer.update(dt);
+    if(this.vrm){this.vpose();this.vrm.update(dt);}
+  }
+  // VRoid は動きが入っていないので骨を直接動かす（構え・走り・攻撃・被弾・倒れ・喜び）
+  vpose(){
+    const N=this.N,t=this.t,s=this.state,T2=performance.now()/1000;const br=Math.sin(T2*2.2+this.o.id)*.04;
+    const set=(n,x,y,z)=>{const b=N(n);if(b)b.rotation.set(x,y,z);};
+    let w=0,ph=0,lean=0,armR=-1.22,armRx=0,armL=1.22,armLx=0,fall=0;
+    if(s==='run'){w=1;ph=t*11;}
+    if(s==='attack'){const k=Math.min(1,t/.75);armRx=-2.4*Math.sin(Math.min(1,k*1.6)*Math.PI*.5)+(k>.55?2.6*(k-.55):0);armR=-.4;lean=.25*Math.sin(k*Math.PI);}
+    if(s==='cast'){const k=Math.min(1,t/.8);armRx=-1.4*Math.sin(k*Math.PI*.6);armLx=-1.4*Math.sin(k*Math.PI*.6);armR=-.6;armL=.6;}
+    if(s==='hit'){const k=Math.min(1,t/.45);lean=-.35*Math.sin(k*Math.PI);}
+    if(s==='death'){fall=Math.min(1,t/.7);}
+    if(s==='cheer'){armR=-.3+Math.sin(t*8)*.15;armL=.3-Math.sin(t*8)*.15;}
+    const sn=Math.sin(ph),cs=Math.cos(ph);
+    set('leftUpperArm',sn*.5*w+armLx,0,armL-br);set('rightUpperArm',-sn*.5*w+armRx,0,armR+br);
+    set('leftLowerArm',0,0,.25);set('rightLowerArm',0,0,-.25);
+    set('leftUpperLeg',-sn*.6*w,0,0);set('rightUpperLeg',sn*.6*w,0,0);
+    set('leftLowerLeg',Math.max(0,-cs)*.9*w+.05,0,0);set('rightLowerLeg',Math.max(0,cs)*.9*w+.05,0,0);
+    set('spine',.06*w+lean+br*.3,0,0);set('head',-.05,0,0);
+    this.vrm.scene.rotation.x=-fall*1.45;this.vrm.scene.position.y=fall*.15;
+  }
+  attackLen(){return this.acts?this.clips.attack.duration:.9;}
+}
+
+/* ---------- 効果（Kenney の粒） ---------- */
+const FX={};const texL=new T.TextureLoader();
+['fire_01','flame_03','magic_02','magic_05','spark_05','star_06','slash_02','circle_05','light_02','smoke_04','twirl_02','symbol_01'].forEach(n=>{FX[n]=texL.load('fx/'+n+'.png');FX[n].colorSpace=T.SRGBColorSpace;});
+const parts=[];
+function spawn(tex,pos,{n=8,color=0xffffff,size=.8,spread=1,life=.7,up=1.5,grow=1.5,spin=true}={}){
+  const k=LEVELS[st.level].fx;n=Math.round(n*k);
+  for(let i=0;i<n;i++){
+    const m=new T.SpriteMaterial({map:FX[tex],color,blending:T.AdditiveBlending,depthWrite:false,transparent:true});
+    const s=new T.Sprite(m);s.position.copy(pos);s.scale.setScalar(size);fxG.add(s);
+    parts.push({s,v:new T.Vector3((Math.random()-.5)*spread*3,Math.random()*up+.3,(Math.random()-.5)*spread*3),life,t:0,size,grow,rot:spin?(Math.random()-.5)*6:0});
+  }
+}
+function ring(tex,pos,{color=0xffd070,size=2.5,life=1.2}={}){
+  const m=new T.MeshBasicMaterial({map:FX[tex],color,blending:T.AdditiveBlending,depthWrite:false,transparent:true,side:T.DoubleSide});
+  const p=new T.Mesh(new T.PlaneGeometry(1,1),m);p.rotation.x=-Math.PI/2;p.position.copy(pos).setY(.05);p.scale.setScalar(size);fxG.add(p);
+  parts.push({s:p,v:new T.Vector3(),life,t:0,size,grow:.3,rot:0,flat:true});
+}
+function bolt(from,to,tex,color,dur=.45){
+  return new Promise(res=>{const m=new T.SpriteMaterial({map:FX[tex],color,blending:T.AdditiveBlending,depthWrite:false});
+    const s=new T.Sprite(m);s.scale.setScalar(1.1);fxG.add(s);parts.push({s,v:new T.Vector3(),life:dur,t:0,size:1.1,grow:0,rot:8,path:[from.clone(),to.clone()],done:res,trail:tex});});
+}
+function updateParts(dt){
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.t+=dt;const k=p.t/p.life;
+    if(p.path){p.s.position.lerpVectors(p.path[0],p.path[1],Math.min(1,k));p.s.position.y+=Math.sin(Math.min(1,k)*Math.PI)*1.2;
+      if(Math.random()<.6*LEVELS[st.level].fx)spawn('smoke_04',p.s.position,{n:.3,color:p.s.material.color.getHex(),size:.5,spread:.1,life:.35,up:.2,grow:1});}
+    else{p.s.position.addScaledVector(p.v,dt);p.v.y-=dt*2.5;}
+    if(p.flat)p.s.rotation.z+=dt*1.2;else p.s.material.rotation+=p.rot*dt;
+    p.s.scale.setScalar(p.size*(1+p.grow*k));p.s.material.opacity=1-k*k;
+    if(k>=1){fxG.remove(p.s);p.s.material.dispose();if(p.flat)p.s.geometry.dispose();parts.splice(i,1);p.done&&p.done();}
+  }
+}
+
+/* ---------- 画面の文字 ---------- */
+const bannerEl=document.getElementById('banner');
+function banner(t){bannerEl.textContent=t;bannerEl.hidden=!t;}
+const v3=new T.Vector3();
+function popDamage(actor,n,crit){v3.copy(actor.o.position);v3.y+=(actor.def.h||1.7)*.9;v3.project(cam);
+  const d=document.createElement('div');d.className='dmg'+(crit?' crit':'');d.textContent=n;
+  d.style.left=((v3.x+1)/2*innerWidth)+'px';d.style.top=((1-v3.y)/2*innerHeight)+'px';document.body.appendChild(d);setTimeout(()=>d.remove(),1000);}
+function drawParty(active){
+  document.getElementById('party').innerHTML=party.map(a=>`<div class="${a===active?'on':''}" style="display:contents">
+    <span class="nm">${a.def.name}</span><span class="jb">${a.def.job}</span>
+    <span class="bar"><i><b style="width:${a.hp/a.maxhp*100}%"></b></i>${String(a.hp).padStart(3,' ')}</span>
+    <span class="bar mp"><i><b style="width:${a.mp/60*100}%"></b></i>${String(a.mp).padStart(2,' ')}</span></div>`).join('');
+}
+function setCmd(i){[...document.querySelectorAll('#cmd div')].forEach((d,k)=>d.classList.toggle('on',k===i));}
+
+/* ---------- 戦闘の進行 ---------- */
+let party=[],enemies=[],gen=0,focus=null;
+const wait=(s,g)=>new Promise(r=>setTimeout(()=>r(g===gen),s*1000));
+function slot(side,i,n){
+  if(side==='p')return new T.Vector3(4.2+(i%2)*1.3,0,-2.1+i*1.45);
+  const cols=n>5?3:2,row=Math.floor(i/cols),col=i%cols;return new T.Vector3(-3.6-row*2.6-(col%2)*.6,0,-2.6+col*(5.4/(cols-1||1))+row*.4);
+}
+async function moveTo(a,to,dur,g){a.play('run');const from=a.o.position.clone();const t0=performance.now();
+  a.o.rotation.y=Math.atan2(to.x-from.x,to.z-from.z);
+  while(true){const k=Math.min(1,(performance.now()-t0)/1000/dur);a.o.position.lerpVectors(from,to,k);if(k>=1)break;await new Promise(r=>requestAnimationFrame(r));if(g!==gen)return false;}
+  return true;}
+const faceSide=a=>{a.o.rotation.y=a.side==='p'?-Math.PI/2:Math.PI/2;};
+async function act(a,g){
+  const foes=(a.side==='p'?enemies:party).filter(x=>x.alive);if(!foes.length)return;
+  const tgt=foes[Math.floor(Math.random()*foes.length)];
+  focus={a,tgt};
+  const magic=a.def.magic;
+  if(a.side==='p'){setCmd(magic?1:0);drawParty(a);}
+  banner(`${a.def.name}の${magic?(typeof magic==='string'?magic:'魔法'):(a.def.skill||'攻撃')}`);
+  let dmg=Math.round((a.side==='p'?70:30)+Math.random()*40),crit=Math.random()<.18;if(crit)dmg=Math.round(dmg*1.8);
+  if(magic){
+    const col=/雷/.test(magic)?0x9fd8ff:/氷/.test(magic)?0x8fe6ff:0xff7a30;
+    ring('symbol_01',a.o.position,{color:col,size:2.4,life:1.3});spawn('magic_02',a.o.position.clone().setY(1.2),{n:6,color:col,size:.7,spread:.4,life:.8,up:1});
+    if(a.vrm)a.state='cast',a.t=0;else a.play('attack');
+    await wait(.45,g);
+    const from=a.o.position.clone().setY(1.3),to=tgt.o.position.clone().setY(1.1);
+    await bolt(from,to,/雷/.test(magic)?'spark_05':'fire_01',col,.5);if(g!==gen)return;
+    spawn(/雷/.test(magic)?'spark_05':'flame_03',to,{n:14,color:col,size:1.1,spread:.8,life:.8,up:2});spawn('light_02',to,{n:2,color:col,size:3,spread:0,life:.4,up:0,grow:1});
+  }else{
+    const home=a.o.position.clone(),dir=new T.Vector3().subVectors(home,tgt.o.position).setY(0).normalize();
+    const front=tgt.o.position.clone().addScaledVector(dir,(tgt.def.h||1.7)*.55+.9);
+    if(!await moveTo(a,front,.45,g))return;
+    a.o.rotation.y=Math.atan2(-dir.x,-dir.z);
+    const len=a.vrm?.8:a.attackLen();a.play('attack');
+    await wait(Math.min(.55,len*.45),g);if(g!==gen)return;
+    const at=tgt.o.position.clone().setY(1);spawn('slash_02',at,{n:2,color:0xfff2c0,size:2.2,spread:.1,life:.3,up:0,grow:.6});
+    spawn('spark_05',at,{n:10,color:0xffc060,size:.6,spread:.8,life:.5,up:2});
+    await wait(Math.max(.1,len*.4),g);if(g!==gen)return;
+    await hitResult(tgt,dmg,crit,g);
+    if(!await moveTo(a,home,.4,g))return;faceSide(a);a.play('idle');banner('');focus=null;return;
+  }
+  await hitResult(tgt,dmg,crit,g);a.play('idle');if(a.vrm)a.state='idle';banner('');focus=null;
+}
+async function hitResult(tgt,dmg,crit,g){
+  tgt.hp=Math.max(0,tgt.hp-dmg);popDamage(tgt,dmg,crit);
+  if(tgt.hp<=0){tgt.alive=false;tgt.play('death');spawn('smoke_04',tgt.o.position.clone().setY(.6),{n:6,color:0x8a7a9a,size:1.4,spread:.6,life:1,up:.6});
+    setTimeout(()=>{if(g!==gen)return;tgt.hp=tgt.maxhp;tgt.alive=true;tgt.play('idle');faceSide(tgt);ring('circle_05',tgt.o.position,{color:0x9fffd0,size:2,life:.9});if(tgt.side==='p')drawParty();},3500);}
+  else tgt.play('hit'),setTimeout(()=>{if(g===gen&&tgt.alive&&tgt.state==='hit')tgt.play('idle');},600);
+  if(tgt.side==='p')drawParty();
+}
+async function battleLoop(g){
+  await wait(1,g);
+  while(g===gen){
+    const order=[];const n=Math.max(party.length,enemies.length);
+    for(let i=0;i<n;i++){if(party[i])order.push(party[i]);if(enemies[i])order.push(enemies[i]);}
+    for(const a of order){if(g!==gen)return;if(!a.alive)continue;await act(a,g);await wait(.35,g);}
+  }
+}
+
+/* ---------- 組み立て ---------- */
+let loadMs=0,building=false,dexMode=false;
+async function build(){
+  gen++;const g=gen;if(building)return;   // 読み込み中に切り替えたら、走っている方が気づいて組み直す
+  building=true;document.getElementById('loading').hidden=false;banner('');
+  const t0=performance.now();const L=LEVELS[st.level];
+  actorsG.clear();parts.length=0;fxG.clear();party=[];enemies=[];
+  try{
+    const pdefs=PARTY[st.party];const edefsAll=ENEMY[st.enemy];
+    const edefs=Array.from({length:L.enemy},(_,i)=>edefsAll[i%edefsAll.length]);
+    const ps=await Promise.all(pdefs.map(d=>new Actor(d,'p').load()));
+    const es=await Promise.all(edefs.map(d=>new Actor(d,'e').load()));
+    if(g!==gen){building=false;document.getElementById('loading').hidden=true;if(!dexMode)build();return;}
+    party=ps;enemies=es;
+    party.forEach((a,i)=>{a.o.position.copy(slot('p',i,4));faceSide(a);actorsG.add(a.o);});
+    enemies.forEach((a,i)=>{a.o.position.copy(slot('e',i,es.length));faceSide(a);actorsG.add(a.o);});
+    if(!stageBuilt)await buildStage(1.7/2.6);
+  }catch(e){document.getElementById('loading').hidden=false;document.getElementById('loading').textContent='読み込み失敗: '+e.message;building=false;return;}
+  applyLevel();loadMs=performance.now()-t0;
+  document.getElementById('loading').hidden=true;building=false;drawParty();setCmd(0);
+  startMeasure();battleLoop(g);
+}
+function applyLevel(){
+  const L=LEVELS[st.level];
+  R.setPixelRatio(L.pr);             // 端末の倍率に関係なく、この倍率で描く
+  R.shadowMap.enabled=!!L.shadow;key.castShadow=!!L.shadow;
+  if(L.shadow){key.shadow.mapSize.set(L.shadow,L.shadow);Object.assign(key.shadow.camera,{left:-14,right:14,top:14,bottom:-14,near:1,far:50});
+    key.shadow.camera.updateProjectionMatrix();key.shadow.bias=-.0006;key.shadow.normalBias=.03;if(key.shadow.map){key.shadow.map.dispose();key.shadow.map=null;}}
+  scene.traverse(o=>{if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.needsUpdate=true);});
+  if(L.bloom){composer=new EffectComposer(R);composer.addPass(new RenderPass(scene,cam));
+    bloomPass=new UnrealBloomPass(new T.Vector2(innerWidth,innerHeight),.55,.5,.82);composer.addPass(bloomPass);composer.addPass(new OutputPass());}
+  else composer=null;
+  resize();
+}
+function resize(){R.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();
+  if(composer){composer.setPixelRatio(LEVELS[st.level].pr);composer.setSize(innerWidth,innerHeight);}}
+addEventListener('resize',resize);
+
+/* ---------- 図鑑 ---------- */
+const DEX=[...PARTY.kaykit.map(d=>({...d,grp:'味方 KayKit'})),{...PARTY.vroid[0],grp:'味方 VRoid'},{...PARTY.vroid[1],name:'リラ',grp:'味方 VRoid'},
+  ...ENEMY.skel.map(d=>({...d,grp:'敵 骸骨（KayKit）'})),...ENEMY.mon.map(d=>({...d,grp:'敵 魔物（Quaternius）'}))];
+let dexI=0,dexActor=null,dexT=0,dexAnim=0;
+async function showDex(){
+  const d=DEX[dexI];document.getElementById('dexName').textContent=d.name;document.getElementById('dexInfo').textContent='読み込み中';
+  const my=++dexToken;let a;try{a=await new Actor(d,'d').load();}catch(e){document.getElementById('dexInfo').textContent='読めなかった: '+e.message;return;}
+  if(my!==dexToken)return;
+  dexG.clear();dexActor=a;a.o.position.set(0,0,0);a.o.rotation.y=0;dexG.add(a.o);dexT=0;dexAnim=0;
+  let tri=0;a.o.traverse(o=>{if(o.isMesh){const g=o.geometry;tri+=(g.index?g.index.count:g.attributes.position.count)/3;}});
+  const nAnim=a.acts?Object.keys(a.acts).length:'骨を直接動かす';
+  document.getElementById('dexInfo').textContent=`${d.grp} / ${Math.round(tri).toLocaleString()}三角形 / ${(sizeOf[d.f]/1024/1024).toFixed(2)}MB / 動き ${nAnim}${a.acts?'種を使用':''}`;
+}
+let dexToken=0;
+function setDex(on){dexMode=on;document.getElementById('dex').hidden=!on;document.getElementById('battleUi').hidden=on;banner('');
+  actorsG.visible=!on;fxG.visible=!on;dexG.visible=on;if(on){gen++;showDex();}else{dexG.clear();dexActor=null;build();}}
+document.getElementById('dexBtn').onclick=()=>setDex(!dexMode);
+document.getElementById('dexClose').onclick=()=>setDex(false);
+document.getElementById('dexPrev').onclick=()=>{dexI=(dexI+DEX.length-1)%DEX.length;showDex();};
+document.getElementById('dexNext').onclick=()=>{dexI=(dexI+1)%DEX.length;showDex();};
+
+/* ---------- 計測 ---------- */
+let meas=null;
+function startMeasure(){meas={t0:performance.now(),frames:[],done:null};}
+function measureFrame(now,dt){if(!meas||meas.done)return;const e=now-meas.t0;if(e<2000)return;meas.frames.push([e,dt]);
+  if(e>12000){const fr=meas.frames,avg=fr.length/10;const secs={};fr.forEach(([t])=>{const s=Math.floor(t/1000);secs[s]=(secs[s]||0)+1;});
+    const vals=Object.values(secs).slice(1,-1);meas.done={avg,min:Math.min(...vals),worst:Math.max(...fr.map(f=>f[1]))};}}
+const gl=R.getContext();let gpu='不明';
+try{const ext=gl.getExtension('WEBGL_debug_renderer_info');if(ext)gpu=gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);}catch(e){}
+gpu=String(gpu).replace(/ANGLE \(|\)$/g,'').slice(0,70);
+const hud=document.getElementById('hud');let fpsNow=0,acc=0,cnt=0,lastTri=0,lastCalls=0;
+function drawHud(){
+  const L=LEVELS[st.level];const cls=v=>v>=50?'good':v>=28?'warn':'bad';let res='';
+  if(meas&&meas.done){const d=meas.done;res=`<div class="big">平均 <span class="${cls(d.avg)}">${d.avg.toFixed(1)}</span> fps</div><div>最低 <span class="${cls(d.min)}">${d.min}</span> fps / 最長 ${d.worst.toFixed(0)} ms</div>`;}
+  else if(meas){const e=(performance.now()-meas.t0)/1000;res=`<div class="big">計測中 ${Math.max(0,Math.min(10,e-2)).toFixed(0)}/10秒</div>`;}
+  hud.innerHTML=`${res}<div><span class="k">今</span> ${fpsNow.toFixed(0)} fps</div>
+  <div><span class="k">味方</span> ${st.party==='kaykit'?'KayKit':'VRoid'} <span class="k">敵</span> ${st.enemy==='skel'?'骸骨':'魔物'}×${enemies.length} <span class="k">負荷</span> ${L.name}</div>
+  <div><span class="k">三角形</span> ${Math.round(lastTri).toLocaleString()} <span class="k">描画</span> ${lastCalls}回 <span class="k">粒</span> ${parts.length}</div>
+  <div><span class="k">影</span> ${L.shadow||'なし'} <span class="k">倍率</span> ${R.getPixelRatio().toFixed(2)} <span class="k">にじみ</span> ${L.bloom?'あり':'なし'}</div>
+  <div><span class="k">読込</span> ${(loadMs/1000).toFixed(2)} 秒 <span class="k">画面</span> ${innerWidth}×${innerHeight}</div>
+  <div class="st">${gpu}</div>${vrmError?`<div class="st bad">${vrmError}</div>`:''}`;
+}
+
+/* ---------- 操作 ---------- */
+function sync(){
+  document.querySelectorAll('[data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===st.party));
+  document.querySelectorAll('[data-e]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.e===st.enemy));
+  document.querySelectorAll('[data-l]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.l===st.level));
+  try{localStorage.setItem('bb',JSON.stringify(st));}catch(e){}
+}
+const rebuild=()=>{sync();if(dexMode)setDex(false);else build();};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{st.party=b.dataset.p;rebuild();});
+document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{st.enemy=b.dataset.e;rebuild();});
+document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{st.level=+b.dataset.l;rebuild();});
+document.getElementById('again').onclick=()=>startMeasure();
+
+/* ---------- 毎フレーム ---------- */
+const look=new T.Vector3(0,1.2,0),camPos=new T.Vector3();let last=performance.now(),clock=0;
+function tick(now){
+  const dtMs=now-last,dt=Math.min(.05,dtMs/1000);last=now;clock+=dt;
+  acc+=dtMs;cnt++;if(acc>500){fpsNow=cnt*1000/acc;acc=0;cnt=0;drawHud();}
+  for(const a of party)a.update(dt);for(const a of enemies)a.update(dt);
+  updateParts(dt);
+  for(const t of torchLights)t.l.intensity=5+Math.sin(clock*9+t.s)*.8+Math.sin(clock*23+t.s)*.5;
+  if(dexMode){
+    if(dexActor){dexActor.update(dt);dexActor.o.rotation.y+=dt*.6;dexT+=dt;
+      if(dexActor.acts&&dexT>2.6){dexT=0;const ks=['idle','attack','hit','run','cheer'];dexAnim=(dexAnim+1)%ks.length;dexActor.play(ks[dexAnim]);}
+      if(dexActor.vrm&&dexT>2.6){dexT=0;const ks=['idle','attack','hit','run','cheer','cast'];dexAnim=(dexAnim+1)%ks.length;dexActor.state=ks[dexAnim];dexActor.t=0;}
+      const h=dexActor.def.h||1.7;camPos.set(0,h*.75,h*1.9+1.4);look.set(0,h*.5,0);}
+  }else{
+    const sway=Math.sin(clock*.25)*1.2;
+    if(focus){const m=new T.Vector3().addVectors(focus.a.o.position,focus.tgt.o.position).multiplyScalar(.5);
+      camPos.lerp(new T.Vector3(m.x+2+sway*.4,4.2,m.z+8.5),dt*2.2);look.lerp(m.setY(1.2),dt*3);}
+    else{camPos.lerp(new T.Vector3(1.2+sway,6.2,12),dt*1.2);look.lerp(new T.Vector3(.2,1.1,0),dt*2);}
+  }
+  cam.position.copy(camPos);cam.lookAt(look);R.info.reset();
+  if(composer)composer.render();else R.render(scene,cam);
+  lastTri=R.info.render.triangles;lastCalls=R.info.render.calls;
+  measureFrame(now,dtMs);requestAnimationFrame(tick);
+}
+camPos.set(1.2,6.2,12);R.info.autoReset=false;
+sync();build();requestAnimationFrame(tick);
+</script>
+</body></html>
