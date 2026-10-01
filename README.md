@@ -5,3 +5,4 @@
 - Kenney particle-pack: CC0（fx/License-kenney.txt）
 - VRoid サンプル（シノ・AvatarSample_F）: VRoid Hub ライセンス 再配布可・改変可・クレジット不要
 - three.js: MIT（vendor/LICENSE-three.txt）
+- Meshy で作ったモデル（行商人・岩甲獣・水の精・宝箱）: オーナーの Meshy 契約で生成（有料プランの生成物は本人所有）

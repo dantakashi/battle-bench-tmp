@@ -68,8 +68,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 <div class="loading" id="loading">読み込み中</div>
 <div class="hud" id="hud" aria-live="polite"></div>
 <div class="ctl">
-  <div class="seg" role="group" aria-label="味方"><span>味方</span><button data-p="kaykit">KayKit</button><button data-p="vroid">VRoid</button></div>
-  <div class="seg" role="group" aria-label="敵"><span>敵</span><button data-e="skel">骸骨</button><button data-e="mon">魔物</button></div>
+  <div class="seg" role="group" aria-label="味方"><span>味方</span><button data-p="kaykit">KayKit</button><button data-p="vroid">VRoid</button><button data-p="meshy">Meshy</button></div>
+  <div class="seg" role="group" aria-label="敵"><span>敵</span><button data-e="skel">骸骨</button><button data-e="mon">魔物</button><button data-e="meshy">Meshy</button></div>
   <div class="seg" role="group" aria-label="負荷"><span>負荷</span><button data-l="0">軽</button><button data-l="1">中</button><button data-l="2">重</button></div>
   <div style="display:flex;gap:6px"><button class="btn" id="dexBtn">図鑑</button><button class="btn" id="again">測り直す</button></div>
 </div>
@@ -100,12 +100,15 @@ const PARTY={
           {f:'p_Barbarian',name:'ガルド',job:'戦士',atk:'2H_Melee_Attack_Slice',skill:'断裂斬'},
           {f:'p_Mage',name:'セラ',job:'魔導士',atk:'Spellcast_Shoot',magic:'火炎魔法'},
           {f:'p_Rogue_Hooded',name:'ノア',job:'斥候',atk:'Dualwield_Melee_Attack_Slice',skill:'双刃'}],
+  meshy:[{f:'m_merchant',name:'ハンナ',job:'行商人',atk:'Right_Hand_Sword_Slash',skill:'護身の剣'},{f:'m_merchant',name:'エダ',job:'術士',atk:'mage_soell_cast',magic:'火炎魔法'},
+         {f:'m_merchant',name:'ルカ',job:'剣士',atk:'Attack',skill:'踏み込み'},{f:'m_merchant',name:'ミラ',job:'魔導士',atk:'mage_soell_cast',magic:'氷結魔法'}],
   vroid:[{f:'v_shino',vrm:1,name:'シノ',job:'剣士',skill:'一閃'},{f:'v_f',vrm:1,name:'リラ',job:'術士',magic:'雷撃魔法'},
          {f:'v_shino',vrm:1,name:'カエデ',job:'槍兵',skill:'突き'},{f:'v_f',vrm:1,name:'ミオ',job:'癒し手',magic:'氷結魔法'}],
 };
 const ENEMY={
   skel:[{f:'e_Skeleton_Warrior',name:'骸骨兵',atk:'1H_Melee_Attack_Chop'},{f:'e_Skeleton_Minion',name:'骸骨',atk:'1H_Melee_Attack_Chop'},
         {f:'e_Skeleton_Rogue',name:'骸骨の斥候',atk:'Dualwield_Melee_Attack_Slice'},{f:'e_Skeleton_Mage',name:'骸骨の術師',atk:'Spellcast_Shoot',magic:1}],
+  meshy:[{f:'m_beast',name:'岩甲獣',h:1.9},{f:'m_spirit',name:'水の精',h:2.1,float:1},{f:'m_chest',name:'宝箱の擬態',h:1.1}],
   mon:[{f:'q_dragon_evolved',name:'翼竜',h:3.2},{f:'q_demon_b',name:'魔族',h:2.2},{f:'q_blue_demon',name:'蒼魔',h:2.2},{f:'q_frog',name:'沼蛙',h:1.3},
        {f:'q_goleling',name:'岩鬼',h:1.6},{f:'q_squidle',name:'烏賊魔',h:1.7},{f:'q_dragon',name:'竜',h:2.5},{f:'q_alpaking',name:'獣王',h:1.6},
        {f:'q_demon_a',name:'小鬼',h:1.6},{f:'q_demon_c',name:'飛魔',h:2},{f:'q_enemy_small',name:'影',h:1.1},{f:'q_skeleton',name:'屍兵',h:1.8}],
@@ -166,7 +169,7 @@ async function buildStage(scale){
 
 /* ---------- 動きの名前を拾う ---------- */
 const PAT={idle:[/(^|\|)Idle($|\|)/,/Flying_Idle/,/Idle/],run:[/Running_A/,/(^|\|)Run($|\|)/,/Fast_Flying/,/Run/,/Walk/],
-  hit:[/Hit_A/,/HitReact/,/HitRecieve/,/Hit/],death:[/Death_A$/,/(^|\|)Death($|\|)/,/Death/],
+  hit:[/Hit_A/,/HitReact/,/HitRecieve/,/Hit/],death:[/Death_A$/,/(^|\|)Death($|\|)/,/Death/,/dying/i],
   attack:[/Attack/,/Punch/,/Headbutt/,/Sword/],cheer:[/Cheer/,/(^|\|)Yes/,/Wave/]};
 function pick(anims,kind,want){if(want){const a=anims.find(x=>x.name===want);if(a)return a;}
   for(const p of PAT[kind]){const a=anims.find(x=>p.test(x.name));if(a)return a;}return anims[0];}
@@ -187,6 +190,7 @@ class Actor{
       const g=await getGltf(this.def.f);const m=SkeletonUtils.clone(g.scene);
       const h=meshHeight(m);m.scale.setScalar((this.def.h||1.7)/h);this.o.add(m);
       m.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=true;}});
+      this.model=m;if(!g.animations.length){this.still=true;this.base=m.position.y;return this;}
       this.mixer=new T.AnimationMixer(m);const A=g.animations;
       this.clips={idle:pick(A,'idle'),run:pick(A,'run'),hit:pick(A,'hit'),death:pick(A,'death'),attack:pick(A,'attack',this.def.atk),cheer:pick(A,'cheer')};
       this.acts={};for(const k in this.clips)this.acts[k]=this.mixer.clipAction(this.clips[k]);
@@ -196,12 +200,13 @@ class Actor{
     this.o.traverse(o=>{if(o.isMesh)o.userData.actor=this;});
     return this;
   }
-  play(k){this.state=k;this.t=0;if(!this.acts)return .9;
+  play(k){this.state=k;this.t=0;if(!this.acts)return k==='attack'?.8:.9;
     const a=this.acts[k];if(this.cur===a&&k!=='attack'&&k!=='hit')return a.getClip().duration;
     a.reset().setEffectiveWeight(1).fadeIn(.12).play();if(this.cur&&this.cur!==a)this.cur.fadeOut(.12);this.cur=a;return a.getClip().duration;}
   update(dt){
     this.t+=dt;if(this.mixer)this.mixer.update(dt);
     if(this.vrm){this.vpose();this.vrm.update(dt);}
+    if(this.still)this.spose();
   }
   // VRoid は動きが入っていないので骨を直接動かす（構え・走り・攻撃・被弾・倒れ・喜び）
   vpose(){
@@ -222,6 +227,15 @@ class Actor{
     set('spine',.06*w+lean+br*.3,0,0);set('head',-.05,0,0);
     this.vrm.scene.rotation.x=-fall*1.45;this.vrm.scene.position.y=fall*.15;
   }
+  // 動きの無いモデル（Meshy の魔物）は体全体を動かす: 浮き沈み・踏み込み・揺れ・沈み込み
+  spose(){const m=this.model,t=this.t,s=this.state,T2=performance.now()/1000+this.o.id;
+    const fl=this.def.float?.35+Math.sin(T2*1.6)*.15:0;let y=fl,sx=1,sy=1,rz=0,rx=0;
+    if(s==='idle'||s==='run')sy=1+Math.sin(T2*2.4)*.025,sx=2-sy;
+    if(s==='run')y+=Math.abs(Math.sin(t*10))*.18;
+    if(s==='attack'){const k=Math.min(1,t/.8);const a=Math.sin(k*Math.PI);sy=1-.12*Math.sin(Math.min(1,k*3)*Math.PI)+.1*a;rx=.35*a;}
+    if(s==='hit'){rz=Math.sin(t*40)*.12*Math.max(0,1-t/.45);}
+    if(s==='death'){const k=Math.min(1,t/.8);y-=k*.6;sy=1-k*.6;rz=k*.4;}
+    m.position.y=this.base+y;m.scale.setScalar(m.userData.s0??=m.scale.x);m.scale.y*=sy;m.scale.x*=sx;m.scale.z*=sx;m.rotation.set(rx,0,rz);}
   attackLen(){return this.acts?this.clips.attack.duration:.9;}
 }
 
@@ -370,7 +384,8 @@ function resize(){R.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/
 addEventListener('resize',resize);
 
 /* ---------- 図鑑 ---------- */
-const DEX=[...PARTY.kaykit.map(d=>({...d,grp:'味方 KayKit'})),{...PARTY.vroid[0],grp:'味方 VRoid'},{...PARTY.vroid[1],name:'リラ',grp:'味方 VRoid'},
+const DEX=[{...PARTY.meshy[0],name:'行商人',grp:'味方 Meshy（自作・骨と動きは Meshy API）'},...ENEMY.meshy.map(d=>({...d,grp:'敵 Meshy（自作・動きはコード）'})),
+  ...PARTY.kaykit.map(d=>({...d,grp:'味方 KayKit'})),{...PARTY.vroid[0],grp:'味方 VRoid'},{...PARTY.vroid[1],name:'リラ',grp:'味方 VRoid'},
   ...ENEMY.skel.map(d=>({...d,grp:'敵 骸骨（KayKit）'})),...ENEMY.mon.map(d=>({...d,grp:'敵 魔物（Quaternius）'}))];
 let dexI=0,dexActor=null,dexT=0,dexAnim=0;
 async function showDex(){
@@ -405,7 +420,7 @@ function drawHud(){
   if(meas&&meas.done){const d=meas.done;res=`<div class="big">平均 <span class="${cls(d.avg)}">${d.avg.toFixed(1)}</span> fps</div><div>最低 <span class="${cls(d.min)}">${d.min}</span> fps / 最長 ${d.worst.toFixed(0)} ms</div>`;}
   else if(meas){const e=(performance.now()-meas.t0)/1000;res=`<div class="big">計測中 ${Math.max(0,Math.min(10,e-2)).toFixed(0)}/10秒</div>`;}
   hud.innerHTML=`${res}<div><span class="k">今</span> ${fpsNow.toFixed(0)} fps</div>
-  <div><span class="k">味方</span> ${st.party==='kaykit'?'KayKit':'VRoid'} <span class="k">敵</span> ${st.enemy==='skel'?'骸骨':'魔物'}×${enemies.length} <span class="k">負荷</span> ${L.name}</div>
+  <div><span class="k">味方</span> ${{kaykit:'KayKit',vroid:'VRoid',meshy:'Meshy'}[st.party]} <span class="k">敵</span> ${{skel:'骸骨',mon:'魔物',meshy:'Meshy'}[st.enemy]}×${enemies.length} <span class="k">負荷</span> ${L.name}</div>
   <div><span class="k">三角形</span> ${Math.round(lastTri).toLocaleString()} <span class="k">描画</span> ${lastCalls}回 <span class="k">粒</span> ${parts.length}</div>
   <div><span class="k">影</span> ${L.shadow||'なし'} <span class="k">倍率</span> ${R.getPixelRatio().toFixed(2)} <span class="k">にじみ</span> ${L.bloom?'あり':'なし'}</div>
   <div><span class="k">読込</span> ${(loadMs/1000).toFixed(2)} 秒 <span class="k">画面</span> ${innerWidth}×${innerHeight}</div>
